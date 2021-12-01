@@ -1,13 +1,18 @@
 package dump
 
-import "fmt"
+import (
+	"context"
+	"io"
+)
 
-type PGCredentials struct {
-	Host, Username, DBname, Password string
-	Port                             int
+type Storage interface {
+	Save(ctx context.Context, fileName string, src io.Reader) error
 }
 
-func (pg PGCredentials) String() string {
-	return fmt.Sprintf(
-		"postgresql://%s:%s@%s:%d/%s", pg.Username, pg.Password, pg.Host, pg.Port, pg.DBname)
+//NewPgDump returns a
+func NewPgDump() *pgDumpService {
+	return &pgDumpService{
+		command: "pg_dump",
+		options: []string{"-Fc", "--clean", "--no-acl", "--no-owner"},
+	}
 }

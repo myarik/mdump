@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"fmt"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"io"
@@ -13,29 +14,30 @@ import (
 	"time"
 )
 
-type dumpStorage interface {
-	Save(dst io.Reader) error
-}
-
 type pgDumpService struct {
 	command string
 	options []string
 }
 
-func (s pgDumpService) Run(ctx context.Context, storage dumpStorage, credentials PGCredentials) error {
+func (s pgDumpService) Run(ctx context.Context, storage Storage, dbURI string) error {
 	if _, err := exec.LookPath(s.command); err != nil {
 		log.Errorf("cannot find a command %s", s.command)
 		return errors.New("cannot find the pg_dump command")
 	}
 
+	log.Debug("starting dump...")
+
 	var cmdOptions []string
 	cmdOptions = append(cmdOptions, s.options...)
-	cmdOptions = append(cmdOptions, []string{"--dbname", credentials.String()}...)
+	cmdOptions = append(cmdOptions, []string{"--dbname", dbURI}...)
 
-	log.Debug("stating dump...")
+	dbName := getDatabaseNameFromURI(dbURI)
+	dumpName := fmt.Sprintf("%s_%s.dump.gz", dbName, time.Now().Format("2006_01_02__15_04"))
 
-	cmd := exec.CommandContext(ctx, s.command, s.options...)
+	cmd := exec.CommandContext(ctx, s.command, cmdOptions...)
 	var errGzip, errStorag error
+
+	log.WithField("cmd", cmd.String()).Debug("dump command")
 
 	outPipe, err := cmd.StdoutPipe()
 	if err != nil {
@@ -63,7 +65,7 @@ func (s pgDumpService) Run(ctx context.Context, storage dumpStorage, credentials
 				log.WithError(err).Warn("cannot close pipe writer")
 			}
 		}()
-		errStorag = storage.Save(pr)
+		errStorag = storage.Save(ctx, dumpName, pr)
 	}()
 
 	// capture and read stderr in case an error occurs
@@ -83,20 +85,20 @@ func (s pgDumpService) Run(ctx context.Context, storage dumpStorage, credentials
 		if ctx.Err() == context.DeadlineExceeded {
 			return errors.New("dump canceled")
 		}
+		log.WithError(err).WithField("cmd", cmd.String()).Error("dump command returns an error")
 		return errors.Wrap(err, "dump command returns an error")
 	}
 	if errStorag != nil {
+		log.WithError(errStorag).WithField("database", dbName).Error("storage returns an error")
 		return errors.Wrap(err, "storage returns an error")
 	}
 	if errGzip != nil {
+		log.WithError(err).WithField("database", dbName).Error("gzip cannot read from stdout")
 		return errors.Wrap(err, "gzip cannot read from stdout")
 	}
+	log.WithFields(log.Fields{
+		"database": dbName,
+		"dump":     dumpName,
+	}).Info("Dump created")
 	return nil
-}
-
-func New() *pgDumpService {
-	return &pgDumpService{
-		command: "pg_dump",
-		options: []string{"-Fc", "--clean", "--no-acl", "--no-owner"},
-	}
 }
