@@ -29,11 +29,6 @@ func Execute() {
 	cmdPgDump.AddCommand(cmdPgDumpLocal)
 	cmdPgDump.AddCommand(cmdPgDumpS3)
 
-	cmdPgDumpLocal.Flags().String("path", "", "path to the dump location")
-	viper.BindPFlag("local_path", cmdPgDumpLocal.Flags().Lookup("path"))
-
-
-
 	if err := mainCmd.Execute(); err != nil {
 		log.WithError(err).Error("unexpected error")
 		os.Exit(1)
