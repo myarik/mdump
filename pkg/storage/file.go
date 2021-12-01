@@ -1,17 +1,19 @@
 package storage
 
 import (
+	"context"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"os"
+	"path/filepath"
 )
 
-type fileStorage struct {
+type localStorage struct {
 	filepath string
 }
 
-func (s fileStorage) Save(src io.Reader) error {
-	dst, err := os.Create(s.filepath)
+func (s localStorage) Save(ctx context.Context, fileName string, src io.Reader) error {
+	dst, err := os.Create(filepath.Join(s.filepath, fileName))
 	if err != nil {
 		return err
 	}
@@ -25,6 +27,6 @@ func (s fileStorage) Save(src io.Reader) error {
 	return err
 }
 
-func NewFileStorage(filepath string) *fileStorage {
-	return &fileStorage{filepath}
+func NewLocalStorage(filepath string) *localStorage {
+	return &localStorage{filepath}
 }
