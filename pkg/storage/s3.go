@@ -6,12 +6,13 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"io"
 )
 
 type s3Storage struct {
 	bucket, key string
-	client      *s3manager.Uploader
+	client      s3manageriface.UploaderAPI
 }
 
 func (s s3Storage) Save(ctx context.Context, fileName string, src io.Reader) error {
